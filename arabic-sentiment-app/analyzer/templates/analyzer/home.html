@@ -1,35 +1,0 @@
-{% extends "analyzer/base.html" %}
-
-{% block content %}
-<section class="services">
-    <div class="container">
-        <div class="card">
-            <div>
-                <i class="fa-regular fa-calendar"></i>
-            </div>
-            <h3> 📄 تحليل ملف</h3>
-            <p>من هنا يمكنك تحليل النصوص من ملف CSV وتصنيفها الى ثلاث فئات إيجابي, سلبي و حيادي</p>
-            <button class="card-button" onclick=location.href='/upload'>تحليل</button>
-        </div>
-
-        <div class="card">
-            <div>
-                <i class="fa-solid fa-box-archive"></i></i>
-            </div>
-            <h3>🐦 إنشاء ملف تويتر</h3>
-            <p>من هنا يمكنك تحليل ملفات تويتر</p>
-            <button class="card-button" onclick= location.href='/twitter'>إنشاء ملف تويتر</button>
-        </div>
-
-        <div class="card">
-            <div>
-                <i class="fa-solid fa-circle-exclamation"></i>
-            </div>
-            <h3>📚 إدارة القاموس</h3>
-            <p>من هنا يمكنك إدارة القاموس عن طريق اضافة كلمة خاطئة وتحويلها الى كلمة صحيحة</p>
-            <button class="card-button" onclick= location.href='/manage-dictionary'>إدارة القاموس</button>
-
-        </div>
-    </div>
-</section>
-{% endblock %}
