@@ -1,0 +1,636 @@
+{% extends "analyzer/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="sub-header">التحليل</h1>
+
+    <div class="cta-buttons">
+        <button class="btn-highlight" onclick="printChartsAsPDF()">تحميل الصفحة كاملة كـ PDF</button>
+    </div>    
+    <div class="container">
+
+        <div class="print-section">
+            <!-- Charts Section -->
+            <div class="box">
+                <!-- Pie Charts Side by Side -->
+                <h2>تحليل المشاعر</h2>
+
+                <div class="form-container">
+                    <div style="chart">
+                        <canvas id="sentimentChart"></canvas>
+                    </div>
+                    <div style="height: 300px;">
+                        <canvas id="sentimentBarChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart">
+                    <h2>تحليل المشاعر حسب المنصة</h2>
+                    <div style="height: 300px;">
+                        <canvas id="sentimentPerPlatformChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="print-section">
+            <div class="box">
+                <h2>مستوى الثقة</h2>
+                
+                <div style="height: 100px;">
+                    <canvas id="confidenceBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="print-section">
+            <div class="box">
+                <h2>نسبة الكلمات المصححة</h2>
+
+                <div class="form-container">
+                    <p>عدد الكلمات المصححة: {{ corrected_word_count }} من {{ total_word_count }} كلمة</p>
+                    <p>نسبة التصحيح: {{ correction_percent }}%</p>
+                </div>
+
+                <div style="height: 100px;">
+                    <canvas id="correctionBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="print-section">
+            <div class="box">
+                <!-- Pie Charts Side by Side -->
+                <h2>توزيع المنصات</h2>
+                <div class="form-container">
+                    <div style="chart">
+                        <canvas id="platformPieChart"></canvas>
+                    </div>
+
+                    <div style="height: 300px;">
+                        <canvas id="platformBarChart"></canvas>  
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>   
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctx1 = document.getElementById('sentimentChart').getContext('2d');
+        var sentimentData = JSON.parse('{{ sentiment_counts|safe }}');
+
+        //  Convert raw values to percentages
+        var totalSentiments = Object.values(sentimentData).reduce((a, b) => a + b, 0);
+        var sentimentValues = Object.values(sentimentData).map(value => ((value / totalSentiments) * 100).toFixed(1));
+
+        var sentimentColors = ['#5bd940', '#f29f1c', '#397dd9'];
+
+        //  Detect Dark or Light Mode
+        function getThemeTextColor() {
+            return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim();
+        }
+
+        var sentimentChart = new Chart(ctx1, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(sentimentData),
+                datasets: [{
+                    data: sentimentValues,
+                    backgroundColor: sentimentColors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false, position: 'top' },
+                    datalabels: {
+                        display: true,
+                        anchor: 'right',
+                        align: 'right',
+                        offset: 10,
+                        clamp: true,
+                        color: getThemeTextColor(),  //  Uses CSS variable for text color
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        },
+                        formatter: function(value) {
+                            return value + "%";  //  Display percentage values inside the chart
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+
+        //  Update text color when theme changes
+        const observer = new MutationObserver(() => {
+            sentimentChart.options.plugins.datalabels.color = getThemeTextColor();  //  Get text color dynamically from CSS
+            sentimentChart.update();
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctxBar = document.getElementById('sentimentBarChart').getContext('2d');
+        var sentimentData = JSON.parse('{{ sentiment_counts|safe }}');
+
+        //  Extract sentiment counts
+        var positiveCount = sentimentData["positive"] || 0;
+        var neutralCount = sentimentData["neutral"] || 0;
+        var negativeCount = sentimentData["negative"] || 0;
+
+        var sentimentLabels = ["Positive", "Neutral", "Negative"];
+        var sentimentValues = [positiveCount, neutralCount, negativeCount];
+        var sentimentColors = ['#5bd940', '#397dd9', '#f29f1c'];
+
+        //  Detect Dark or Light Mode
+        function getThemeTextColor() {
+            return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim();
+        }
+
+        var sentimentBarChart = new Chart(ctxBar, {
+            type: 'bar',
+            data: {
+                labels: sentimentLabels,
+                datasets: [{
+                    data: sentimentValues,
+                    backgroundColor: sentimentColors,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 25,  // Adds extra space at the top to prevent cutoff
+                        left: 30,
+                        right: 30
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },  // No legend needed
+                    tooltip: {
+                        enabled: true,
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return tooltipItem.raw + " Occurrences";  // Show raw counts in tooltip
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: true,  // Always show labels on bars
+                        anchor: 'end',  // Position labels inside the chart
+                        align: 'top',  // Show labels at the top of bars
+                        color: getThemeTextColor(),
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        },
+                        formatter: function(value) {
+                            return value;  // Show raw count on top of each bar
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+        //  Update text color when theme changes
+        const observer = new MutationObserver(() => {
+            platformChart.options.plugins.datalabels.color = getThemeTextColor();  // Get text color dynamically from CSS
+            platformChart.update();
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctx2 = document.getElementById('platformPieChart').getContext('2d');
+        var platformDataPie = JSON.parse('{{ platform_counts|safe }}');
+
+        
+        //  Convert raw values to percentages
+        var totalPlatforms = Object.values(platformDataPie).reduce((a, b) => a + b, 0);
+        var platformValues = Object.values(platformDataPie).map(value => ((value / totalPlatforms) * 100).toFixed(1));
+
+        var platformColors = [ '#1E88E5','#8E24AA', '#FB8C00', '#43A047', '#3949AB', '#E53935', '#00ACC1', '#5E35B1', '#6D4C41'];
+
+        //  Detect Dark or Light Mode
+        function getThemeTextColor() {
+            return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim();
+        }
+
+        var platformChart = new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(platformDataPie),
+                datasets: [{
+                    data: platformValues,
+                    backgroundColor: platformColors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false, position: 'top' },
+                    datalabels: {
+                        display: true,
+                        anchor: 'right',
+                        align: 'right',
+                        offset: 10,
+                        clamp: true,
+                        color: getThemeTextColor(),  //  Uses CSS variable for text color
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        },
+                        formatter: function(value) {
+                            return value + "%";  //  Display percentage values inside the chart
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+
+        //  Update text color when theme changes
+        const observer = new MutationObserver(() => {
+            platformChart.options.plugins.datalabels.color = getThemeTextColor();  //  Get text color dynamically from CSS
+            platformChart.update();
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctx3 = document.getElementById('platformBarChart').getContext('2d');
+        var platformDataBar = JSON.parse('{{ platform_counts|safe }}');
+
+        var platformNames = Object.keys(platformDataBar);
+        var platformValues = Object.values(platformDataBar);
+        var platformColors = [ '#1E88E5','#8E24AA', '#FB8C00', '#43A047', '#3949AB', '#E53935', '#00ACC1', '#5E35B1', '#6D4C41'];
+
+
+
+        //  Detect Dark or Light Mode
+        function getThemeTextColor() {
+            return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim();
+        }
+
+        var platformChart = new Chart(ctx3, {
+            type: 'bar',
+            data: {
+                labels: platformNames,
+                datasets: [{
+                    data: platformValues,
+                    backgroundColor: platformColors
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        top: 20  //  Adds extra space at the top to prevent cutoff
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 },
+                        suggestedMax: Math.max(...platformValues) + 2  //  Auto-adjusts max value to prevent cutoff
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: true,
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                return tooltipItem.raw + " Occurrences";  //  Show occurrences in tooltip
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: true,  //  Always show labels
+                        anchor: 'end',  //  Position labels inside the chart
+                        align: function(context) {
+                            var value = context.raw;
+                            return value === Math.max(...platformValues) ? 'bottom' : 'top';  //  Prevent highest label from going outside
+                        },
+                        color: getThemeTextColor(),
+                        font: {
+                            weight: 'bold',
+                            size: 14
+                        },
+                        formatter: function(value) {
+                            return value;  //  Show raw count on top of each bar
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+            //  Update text color when theme changes
+        const observer = new MutationObserver(() => {
+            platformChart.options.plugins.datalabels.color = getThemeTextColor();  //  Get text color dynamically from CSS
+            platformChart.update();
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    });
+
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctx4 = document.getElementById('sentimentPerPlatformChart').getContext('2d');
+        var sentimentPerPlatform = JSON.parse('{{ sentiment_per_platform|safe }}');
+        var platforms = [...new Set(sentimentPerPlatform.map(item => item.platform))];
+        var sentiments = ["positive", "neutral", "negative"];
+        var datasetColors = {
+            "positive": "#5bd940",
+            "neutral": "#397dd9",
+            "negative": "#f29f1c"
+        };
+    
+        // Compute total sentiment counts per platform
+        var platformTotals = {};
+        platforms.forEach(platform => {
+            platformTotals[platform] = sentimentPerPlatform
+                .filter(item => item.platform === platform)
+                .reduce((sum, item) => sum + item.count, 0);
+        });
+    
+        // Generate datasets as percentages instead of absolute counts
+        var datasets = sentiments.map(sentiment => ({
+            label: sentiment.charAt(0).toUpperCase() + sentiment.slice(1),
+            backgroundColor: datasetColors[sentiment],
+            data: platforms.map(platform => {
+                var entry = sentimentPerPlatform.find(item => item.platform === platform && item.sentiment === sentiment);
+                var count = entry ? entry.count : 0;
+                var total = platformTotals[platform] || 1;  // Prevent division by zero
+                return (count / total) * 100;  // Convert to percentage
+            })
+        }));
+    
+        new Chart(ctx4, {
+            type: 'bar',
+            data: {
+                labels: platforms,
+                datasets: datasets
+            },
+            options: {
+                indexAxis: 'y',  //  Makes the bar chart horizontal
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,  //  Enables stacking on X-axis
+                        beginAtZero: true,
+                        max: 100,  //  Forces scale to 100%
+                        ticks: {
+                            callback: function(value) {
+                                return value + "%";  //  Show percentages instead of numbers
+                            }
+                        }
+                    },
+                    y: { stacked: true }
+                },
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        enabled: true,  //  Enables hover tooltips
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                let value = parseFloat(tooltipItem.raw); //  Ensure raw value is a number
+                                return value.toFixed(1) + "%";  //  Properly format values
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: false,  //  Ensure labels are always displayed
+                    }
+
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+    });
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctxConfidence = document.getElementById('confidenceBarChart').getContext('2d');
+        var confidenceData = JSON.parse('{{ confidence_distribution|safe }}');
+    
+        if (!confidenceData || isNaN(confidenceData["low"]) || isNaN(confidenceData["high"])) {
+            console.error("Confidence data is missing or invalid:", confidenceData);
+            document.getElementById("confidenceBarChart").style.display = "none";  
+            return;
+        }
+    
+        var totalConfidence = confidenceData["low"] + confidenceData["high"];
+        if (totalConfidence === 0) {
+            console.warn("No confidence data available.");
+            document.getElementById("confidenceBarChart").style.display = "none"; 
+            return;
+        }
+    
+        var confidenceValues = [
+            totalConfidence > 0 ? ((confidenceData["high"] / totalConfidence) * 100).toFixed(2) : 0,
+            totalConfidence > 0 ? ((confidenceData["low"] / totalConfidence) * 100).toFixed(2) : 0,
+        ];
+    
+        var confidenceColors = ['#397dd9', '#f29f1c'];  
+    
+        new Chart(ctxConfidence, {
+            type: 'bar',
+            data: {
+                labels: ["الثقة"],
+                datasets: [
+                    {
+                        label: "مرتفع",
+                        backgroundColor: confidenceColors[0],
+                        data: [confidenceValues[0]]
+                    },
+                    {
+                        label: "منخفض",
+                        backgroundColor: confidenceColors[1],
+                        data: [confidenceValues[1]]
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',  
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,  
+                        beginAtZero: true,
+                        max: 100,  
+                        ticks: {
+                            callback: function(value) {
+                                return value + "%";  
+                            }
+                        }
+                    },
+                    y: { stacked: true }
+                },
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        enabled: true,  //  Enables hover tooltips
+                        callbacks: {
+                            label: function(tooltipItem) {
+                                let value = parseFloat(tooltipItem.raw); //  Ensure raw value is a number
+                                return value.toFixed(1) + "%";  //  Properly format values
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: false,  //  Ensure labels are always displayed
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]  
+        });
+    });
+
+</script>   
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var ctxCorrection = document.getElementById('correctionBarChart').getContext('2d');
+    
+        var correctedWords = {{ corrected_word_count|default:0 }};
+        var totalWords = {{ total_word_count|default:0 }};
+        var remainingWords = totalWords - correctedWords;
+    
+        if (totalWords === 0) {
+            document.getElementById("correctionBarChart").style.display = "none";
+            return;
+        }
+    
+        var correctionColors = ['#5bd940', '#397dd9'];  // green for corrected, gray for untouched
+    
+        new Chart(ctxCorrection, {
+            type: 'bar',
+            data: {
+                labels: ["تصحيح الكلمات"],  // one row label
+                datasets: [
+                    {
+                        label: "كلمات مصححة",
+                        backgroundColor: correctionColors[0],
+                        data: [correctedWords]
+                    },
+                    {
+                        label: "كلمات غير مصححة",
+                        backgroundColor: correctionColors[1],
+                        data: [remainingWords]
+                    }
+                ]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: true,
+                        beginAtZero: true,
+                        max: totalWords + 100,  // allow breathing room
+                        ticks: {
+                            stepSize: 100
+                        }
+                    },
+                    y: { stacked: true }
+                },
+                plugins: {
+                    legend: { display: true, position: 'top' },
+                    tooltip: {
+                        callbacks: {
+                            label: function (tooltipItem) {
+                                return tooltipItem.dataset.label + ": " + tooltipItem.raw + " كلمة";
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: false,
+                        color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim(),
+                        font: { weight: 'bold', size: 14 },
+                        formatter: function (value) {
+                            return value + " كلمة";
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+    });
+
+</script>    
+
+<script>
+    async function printChartsAsPDF() {
+        const sections = document.querySelectorAll(".print-section");
+        const pdf = new jspdf.jsPDF('p', 'mm', 'a4');
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        let yOffset = 10;
+
+        // Simple dark/light detection
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        const bgColor = isDark ? "#121212" : "#ffffff";
+
+        for (let section of sections) {
+            const canvas = await html2canvas(section, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: bgColor
+            });
+
+            const imgData = canvas.toDataURL("image/png");
+            const imgProps = pdf.getImageProperties(imgData);
+            const imgWidth = pageWidth - 20;
+            const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+            if (yOffset + imgHeight > pageHeight - 10) {
+                pdf.addPage();
+                yOffset = 10;
+            }
+
+            pdf.addImage(imgData, 'PNG', 10, yOffset, imgWidth, imgHeight);
+            yOffset += imgHeight + 5;
+        }
+
+        pdf.save("statistics_compact.pdf");
+    }
+</script>
+
+{% endblock %}
