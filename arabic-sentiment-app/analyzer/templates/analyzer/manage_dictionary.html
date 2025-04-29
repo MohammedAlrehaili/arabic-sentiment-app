@@ -1,0 +1,45 @@
+{% extends "analyzer/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="sub-header" style="text-align: center;">إدارة القاموس المحلي</h1>
+
+    <!-- Form to Add a New Word -->
+    <div class="box">
+        <h2 class="form-title" style="text-align: center;">إضافة الكلمات في القاموس:</h2>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="incorrect_word" class="centered-label">الكلمة الخاطئة:</label>
+                <input type="text" id="incorrect_word" name="incorrect_word" required placeholder="مثال: خيد, مشكل, ياب">
+            </div>
+
+            <div class="form-group">
+                <label for="correct_word" class="centered-label">الكلمة الصحيحة:</label>
+                <input type="text" id="correct_word" name="correct_word" required placeholder="مثال: جيد, مشكلة, باب">
+            </div>
+
+            <div class="cta-buttons" style="text-align: center;">
+                <button type="submit" name="action" value="add" class="btn-secondary">إضافة</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- List of Words with Remove Button -->
+    <div class="box">
+        <h2 class="form-title" style="text-align: center;">الكلمات الحالية في القاموس:</h2>
+        <div class="word-list">
+            {% for incorrect, correct in dictionary.items %}
+            <div class="word-item">
+                <p class="centered-text">تصحيح <strong>{{ incorrect }}</strong> إلى <strong>{{ correct }}</strong></p>
+                <form method="POST" class="remove-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="word_to_remove" value="{{ incorrect }}">
+                    <button type="submit" name="action" value="remove" class="btn-secondary">إزالة</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

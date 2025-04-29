@@ -1,0 +1,138 @@
+{% extends "analyzer/base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="sub-header">تحليل ملف</h2>
+
+    <div class="box">
+        <!--Combined Form -->
+        <form method="post" enctype="multipart/form-data" class="form">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <!-- Drag & Drop Area -->
+                 
+                <div id="upload-area" class="upload-area">
+                    <p for="csv_file" class="custom-file-upload"> اختر ملف CSV</p>
+                    <input type="file" name="csv_file" id="csv_file" accept=".csv" required>
+                </div>
+            
+                <!-- File Name Display -->
+                <p id="file-name" class="file-name">لم يتم اختيار أي ملف</p>
+                <label>يجب أن يحتوي الملف على عمود باسم "text"</label>
+
+            </div>  
+
+            <div class="form-sections">
+                <!-- القسم الأيمن: اختيار النموذج -->
+                <div class="form-half">
+                    <label for="model_selection" class="form-title">اختر النموذج:</label>
+                    <select name="model_selection" id="model_selection" required>
+                        <option value="gemma3:27b">Gemma 3 27b</option>
+                        <option value="gemma3:12b">Gemma 3 12b</option>
+                        <option value="gemma3:4b">Gemma 3 4b</option>
+                        <option value="gemma3:1b">Gemma 3 1b</option>
+                        <option value="salmatrafi/acegpt:13b">ACEGPT 13B</option>
+                        <option value="jwnder/jais-adaptive:7b">Jais Adaptive 7B</option>
+                        <option value="prakasharyan/qwen-arabic">Qwen Arabic 1.5b</option>
+                    </select>
+                </div>
+            
+                <!-- القسم الأيسر: اختيار طريقة التصحيح -->
+                <div class="form-half">
+                    <label class="form-title">اختر طريقة تصحيح الأخطاء (اختياري ):</label>
+                    
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="spell_check_dict" name="spell_check_dict">
+                        <label for="spell_check_dict">📚 القاموس المحلي</label>
+                    </div>
+            
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="spell_check_languagetool" name="spell_check_languagetool">
+                        <label for="spell_check_languagetool">🔧 التصحيح التلقائي</label>
+                    </div>
+            
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="spell_check_ai" name="spell_check_ai">
+                        <label for="spell_check_ai">🤖 التصحيح باستخدام الذكاء الاصطناعي</label>
+                    </div>
+                </div>
+            </div>
+                        
+
+            <div class="buttons-and-progress">
+                <div class="cta-buttons">
+                    <button type="submit" class="btn-highlight">بدء التحليل</button>
+                    <button type="submit" id="cancel-button" class="btn-secondary" style="display: none;">إيقاف التحليل</button>
+                </div>
+            
+                <div id="progress-container" style="display:none; margin-top: 20px;">
+                    <p class="progress-title">نسبة التحليل:</p>
+                    <div class="progress-bar-background">
+                        <div id="progress-bar" class="progress-bar-fill">
+                            0%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+
+    {% if error %}
+    <div class="cta-buttons">
+        خطأ: {{ error }}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.querySelector("form").addEventListener("submit", function (e) {
+        const progressBar = document.getElementById("progress-bar");
+        const progressContainer = document.getElementById("progress-container");
+        const cancelBtn = document.getElementById("cancel-button");
+    
+        let isCancelled = false;
+    
+        // Show progress bar & cancel button
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressBar.textContent = "0%";
+        cancelBtn.style.display = "inline-block";
+    
+        // Send cancel request on click
+        cancelBtn.onclick = () => {
+            fetch("/cancel-upload/", {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": document.querySelector('[name=csrfmiddlewaretoken]').value,
+                },
+            });
+            isCancelled = true;
+            cancelBtn.disabled = true;
+            cancelBtn.textContent = "تم الإيقاف";
+        };
+    
+        // Start polling progress
+        const interval = setInterval(() => {
+            if (isCancelled) return;
+    
+            fetch("/get-upload-progress/")
+                .then(res => res.json())
+                .then(data => {
+                    const percent = data.percent;
+                    progressBar.style.width = percent + "%";
+                    progressBar.textContent = percent + "%";
+    
+                    if (percent >= 100) {
+                        clearInterval(interval);
+                        cancelBtn.style.display = "none";
+                    }
+                })
+                .catch(err => {
+                    console.error("Polling error:", err);
+                    clearInterval(interval);
+                });
+        }, 1000);
+    });
+    </script>    
+
+{% endblock %}
